@@ -1,0 +1,3 @@
+# Streamlit & OpenAI Chatbot requirements
+streamlit
+openai
