@@ -6,12 +6,11 @@ import time
 from typing import Dict, List
 import os
 
-# Get OpenAI API key from environment or Streamlit secrets
-# Then set up the OpenAI client using that key
+# Get OpenAI API key from environment variable or Streamlit secrets
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+# Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
-
-# Simulated email sending function (logs email and stores it in session state)
+# Email sending function for function calling
 def send_email(to: str, subject: str, body: str) -> str:
     print(f"Email to {to}: {subject}\n{body}")
     if 'sent_emails' not in st.session_state:
@@ -27,7 +26,7 @@ def send_email(to: str, subject: str, body: str) -> str:
 
     return f"Email sent successfully to {to} with subject: {subject}"
 
-# Tell the assistant that it can call the send_email function when needed
+# Tool definition for OpenAI function calling
 email_tool = {
     "type": "function",
     "function": {
@@ -45,7 +44,6 @@ email_tool = {
     }
 }
 
-# Create a new assistant that only replies using the given training content
 def create_assistant(training_content: str) -> str:
     instructions = f"""
     You are a helpful AI assistant that can ONLY answer questions based on the provided training content below. 
@@ -75,7 +73,6 @@ def create_assistant(training_content: str) -> str:
         st.error(f"Error creating assistant: {str(e)}")
         return None
 
-# Talk to the assistant: send user message, get response, and handle tool calls
 def chat_with_assistant(assistant_id: str, message: str, thread_id: str = None) -> tuple:
     try:
         if thread_id is None:
@@ -102,7 +99,6 @@ def chat_with_assistant(assistant_id: str, message: str, thread_id: str = None) 
             if run_status.status == 'completed':
                 break
             elif run_status.status == 'requires_action':
-                # If the assistant wants to use a tool (like sending an email), do it here
                 tool_calls = run_status.required_action.submit_tool_outputs.tool_calls
                 tool_outputs = []
 
@@ -135,18 +131,16 @@ def chat_with_assistant(assistant_id: str, message: str, thread_id: str = None) 
         st.error(f"Error chatting with assistant: {str(e)}")
         return None, thread_id
 
-# Main Streamlit app logic
 def main():
     st.set_page_config(page_title="AskWithMe - Context-Restricted AI Chatbot", page_icon="🤖", layout="wide")
-    st.title("🤖 AskWithMe")
+    st.title("AskWithMe")
     st.markdown("*Powered by OpenAI Assistants API with Function Calling*")
 
-    # Sidebar: for email input and viewing saved emails
     with st.sidebar:
-        st.header("⚙️ Configuration")
+        st.header(" Configuration")
         st.info("OpenAI API Key is set in code for deployment.")
 
-        st.header("📧 Email Capture")
+        st.header("Email Capture")
         user_email = st.text_input("Your Email Address")
         if user_email and st.button("Save Email"):
             if 'user_emails' not in st.session_state:
@@ -162,9 +156,8 @@ def main():
 
     col1, col2 = st.columns([1, 1])
 
-    # Left side: where user inputs training data and creates assistant
     with col1:
-        st.header("📚 Training Content")
+        st.header(" Training Content")
 
         training_content = st.text_area(
             "Enter your training content:",
@@ -172,7 +165,7 @@ def main():
             placeholder="Enter FAQs, product details, or any content you want the AI to learn from..."
         )
 
-        if st.button("💾 Save Context & Create Assistant", type="primary"):
+        if st.button(" Save Context & Create Assistant", type="primary"):
             if training_content.strip():
                 with st.spinner("Creating your custom assistant..."):
                     assistant_id = create_assistant(training_content)
@@ -180,21 +173,20 @@ def main():
                         st.session_state.assistant_id = assistant_id
                         st.session_state.training_content = training_content
                         st.session_state.thread_id = None
-                        st.success("✅ Assistant created successfully!")
+                        st.success("Assistant created successfully!")
                         st.rerun()
             else:
                 st.error("Please enter some training content first!")
 
-    # Right side: chat UI with assistant
     with col2:
-        st.header("💬 Chat with AI")
+        st.header(" Chat with AI")
 
         if 'assistant_id' in st.session_state:
-            st.success("🟢 Assistant is ready!")
+            st.success(" Assistant is ready!")
             with st.expander("View Training Content"):
                 st.text(st.session_state.training_content[:500] + "..." if len(st.session_state.training_content) > 500 else st.session_state.training_content)
         else:
-            st.warning("⚠️ Please save training content first to start chatting")
+            st.warning(" Please save training content first to start chatting")
 
         if 'assistant_id' in st.session_state:
             if 'chat_history' not in st.session_state:
@@ -210,7 +202,7 @@ def main():
             if user_message:
                 st.session_state.chat_history.append(("user", user_message))
 
-                with st.spinner("🤔 Thinking..."):
+                with st.spinner(" Thinking..."):
                     response, thread_id = chat_with_assistant(
                         st.session_state.assistant_id,
                         user_message,
@@ -222,8 +214,7 @@ def main():
                         st.session_state.chat_history.append(("assistant", response))
                         st.rerun()
 
-    # Display sent emails below the chat interface
-    st.header("📨 Email Log")
+    st.header(" Email Log")
     if 'sent_emails' in st.session_state and st.session_state.sent_emails:
         for i, email in enumerate(st.session_state.sent_emails):
             with st.expander(f"Email {i+1}: {email['subject']} - {email['timestamp']}"):
@@ -234,8 +225,7 @@ def main():
     else:
         st.info("No emails sent yet. Try asking the AI to send an email!")
 
-    # Expandable section with usage instructions
-    with st.expander("ℹ️ How to Use"):
+    with st.expander(" How to Use"):
         st.markdown("""
         ### Steps to get started:
 
@@ -246,11 +236,11 @@ def main():
         5. **Test Email Function**: Ask the AI to send an email (e.g., "Send me a summary via email")
 
         ### Features:
-        - ✅ Context-restricted responses (AI only uses your training data)
-        - ✅ Function calling for email simulation
-        - ✅ Email capture and storage
-        - ✅ Real-time chat interface
-        - ✅ Email logging and history
+        -  Context-restricted responses (AI only uses your training data)
+        -  Function calling for email simulation
+        -  Email capture and storage
+        -  Real-time chat interface
+        -  Email logging and history
 
         ### Example prompts:
         - "What information do you have about [topic]?"
